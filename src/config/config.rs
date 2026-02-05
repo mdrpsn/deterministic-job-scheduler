@@ -11,20 +11,20 @@ pub struct Config {
 impl Config {
     pub fn from_env() -> Self {
         let database_url =
-            std::env::var(\"DATABASE_URL\").expect(\"DATABASE_URL must be set\");
+            std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
-        let max_concurrency = std::env::var(\"MAX_CONCURRENCY\")
+        let max_concurrency = std::env::var("MAX_CONCURRENCY")
             .ok()
             .and_then(|v| v.parse().ok())
             .unwrap_or(10);
 
-        let scheduler_tick_interval = std::env::var(\"SCHEDULER_TICK_MS\")
+        let scheduler_tick_interval = std::env::var("SCHEDULER_TICK_MS")
             .ok()
             .and_then(|v| v.parse::<u64>().ok())
             .map(Duration::from_millis)
             .unwrap_or(Duration::from_millis(500));
 
-        let job_timeout = std::env::var(\"JOB_TIMEOUT_SECS\")
+        let job_timeout = std::env::var("JOB_TIMEOUT_SECS")
             .ok()
             .and_then(|v| v.parse::<u64>().ok())
             .map(Duration::from_secs)
