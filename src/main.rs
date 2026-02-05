@@ -5,7 +5,7 @@ use tracing_subscriber::EnvFilter;
 
 use crate::config::Config;
 use crate::executor::Executor;
-use crate::executor::SleepJobHandler;
+use crate::executor::sleep_handler::SleepJobHandler;
 use crate::orchestrator::Orchestrator;
 use crate::storage::PostgresJobRepository;
 
