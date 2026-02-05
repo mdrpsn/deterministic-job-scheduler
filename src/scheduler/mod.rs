@@ -1,3 +1,3 @@
 pub mod scheduler;
 
-pub use scheduler::{select_jobs, SchedulerDecision, SchedulerInput};
+pub use scheduler::{select_jobs, SchedulerInput};
