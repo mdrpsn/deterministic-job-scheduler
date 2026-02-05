@@ -78,7 +78,7 @@ where
 
                 Err(_) => {
                     let failure =
-                        Failure::timeout(\"job execution exceeded timeout\");
+                        Failure::timeout("job execution exceeded timeout");
 
                     let _ = repo
                         .update_job_state(
