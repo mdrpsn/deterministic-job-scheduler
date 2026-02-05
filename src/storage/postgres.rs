@@ -1,4 +1,4 @@
-use sqlx::{PgPool, Postgres, Transaction};
+use sqlx::{PgPool, Postgres, Transaction, Row};
 use uuid::Uuid;
 
 use crate::domain::failure::{Failure, FailureKind};
@@ -19,19 +19,11 @@ impl PostgresJobRepository {
 #[async_trait::async_trait]
 impl JobRepository for PostgresJobRepository {
     async fn fetch_queued_jobs(&self) -> Result<Vec<Job>, RepositoryError> {
-        let rows = sqlx::query!(
+        let rows = sqlx::query(
             r#"
             SELECT
-                id,
-                payload,
-                priority,
-                state,
-                attempt,
-                max_attempts,
-                failure_type,
-                failure_reason,
-                created_at,
-                updated_at
+                id, payload, priority, state, attempt, max_attempts,
+                failure_type, failure_reason, created_at, updated_at
             FROM jobs
             WHERE state = 'queued'
             ORDER BY priority DESC, created_at ASC
@@ -44,19 +36,11 @@ impl JobRepository for PostgresJobRepository {
     }
 
     async fn fetch_running_jobs(&self) -> Result<Vec<Job>, RepositoryError> {
-        let rows = sqlx::query!(
+        let rows = sqlx::query(
             r#"
             SELECT
-                id,
-                payload,
-                priority,
-                state,
-                attempt,
-                max_attempts,
-                failure_type,
-                failure_reason,
-                created_at,
-                updated_at
+                id, payload, priority, state, attempt, max_attempts,
+                failure_type, failure_reason, created_at, updated_at
             FROM jobs
             WHERE state = 'running'
             "#
@@ -70,29 +54,23 @@ impl JobRepository for PostgresJobRepository {
     async fn insert_job(&self, job: &Job) -> Result<(), RepositoryError> {
         let mut tx = self.pool.begin().await?;
 
-        sqlx::query!(
+        sqlx::query(
             r#"
             INSERT INTO jobs (
-                id,
-                payload,
-                priority,
-                state,
-                attempt,
-                max_attempts,
-                created_at,
-                updated_at
+                id, payload, priority, state, attempt, max_attempts,
+                created_at, updated_at
             )
-            VALUES (, , , , , , , )
-            "#,
-            job.id,
-            job.payload,
-            job.priority,
-            state_to_str(job.state),
-            job.attempt as i32,
-            job.max_attempts as i32,
-            job.created_at,
-            job.updated_at
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+            "#
         )
+        .bind(job.id)
+        .bind(&job.payload)
+        .bind(job.priority)
+        .bind(state_to_str(job.state))
+        .bind(job.attempt as i32)
+        .bind(job.max_attempts as i32)
+        .bind(job.created_at)
+        .bind(job.updated_at)
         .execute(&mut *tx)
         .await?;
 
@@ -110,24 +88,24 @@ impl JobRepository for PostgresJobRepository {
     ) -> Result<(), RepositoryError> {
         let mut tx = self.pool.begin().await?;
 
-        sqlx::query!(
+        sqlx::query(
             r#"
             UPDATE jobs
             SET
-                state = ,
-                attempt = attempt + CASE WHEN  THEN 1 ELSE 0 END,
-                failure_type = ,
-                failure_reason = ,
+                state = $1,
+                attempt = attempt + CASE WHEN $2 THEN 1 ELSE 0 END,
+                failure_type = $3,
+                failure_reason = $4,
                 updated_at = now()
-            WHERE id =  AND state = 
-            "#,
-            state_to_str(to),
-            to == JobState::Failed,
-            failure.map(|f| failure_kind_to_str(f.kind)),
-            failure.map(|f| f.reason.as_str()),
-            job_id,
-            state_to_str(from)
+            WHERE id = $5 AND state = $6
+            "#
         )
+        .bind(state_to_str(to))
+        .bind(to == JobState::Failed)
+        .bind(failure.map(|f| failure_kind_to_str(f.kind)))
+        .bind(failure.map(|f| f.reason.as_str()))
+        .bind(job_id)
+        .bind(state_to_str(from))
         .execute(&mut *tx)
         .await?;
 
@@ -138,15 +116,10 @@ impl JobRepository for PostgresJobRepository {
 }
 
 fn row_to_job(row: sqlx::postgres::PgRow) -> Result<Job, RepositoryError> {
-    use sqlx::Row;
-
     let failure = match row.try_get::<Option<String>, _>("failure_type")? {
         Some(kind) => {
             let reason: String = row.try_get("failure_reason")?;
-            Some(Failure {
-                kind: str_to_failure_kind(&kind),
-                reason,
-            })
+            Some(Failure { kind: str_to_failure_kind(&kind), reason })
         }
         None => None,
     };
@@ -156,8 +129,8 @@ fn row_to_job(row: sqlx::postgres::PgRow) -> Result<Job, RepositoryError> {
         payload: row.try_get("payload")?,
         priority: row.try_get("priority")?,
         state: str_to_state(row.try_get("state")?),
-        attempt: row.try_get::<i32, _>("attempt")? as u32,
-        max_attempts: row.try_get::<i32, _>("max_attempts")? as u32,
+        attempt: row.try_get::<i32,_>("attempt")? as u32,
+        max_attempts: row.try_get::<i32,_>("max_attempts")? as u32,
         failure,
         created_at: row.try_get("created_at")?,
         updated_at: row.try_get("updated_at")?,
@@ -209,18 +182,17 @@ async fn insert_event(
     to: JobState,
     reason: &str,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query!(
+    sqlx::query(
         r#"
         INSERT INTO job_events (job_id, from_state, to_state, event_reason)
-        VALUES (, , , )
-        "#,
-        job_id,
-        state_to_str(from),
-        state_to_str(to),
-        reason
+        VALUES ($1,$2,$3,$4)
+        "#
     )
+    .bind(job_id)
+    .bind(state_to_str(from))
+    .bind(state_to_str(to))
+    .bind(reason)
     .execute(&mut **tx)
     .await?;
-
     Ok(())
 }
