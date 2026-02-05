@@ -44,14 +44,14 @@ where
     pub async fn run(&self) {
         loop {
             if let Err(err) = self.tick().await {
-                warn!(error = ?err, \"orchestration tick failed\");
+                warn!(error = ?err, "orchestration tick failed");
             }
 
             sleep(self.tick_interval).await;
         }
     }
 
-    async fn tick(&self) -> Result<(), OrchestrationError> {
+    async fn tick(&self) -> Result<(), crate::orchestrator::error::OrchestrationError> {
         // 1. Snapshot current system state
         let queued_jobs = self.repository.fetch_queued_jobs().await?;
         let running_jobs = self.repository.fetch_running_jobs().await?;
@@ -72,7 +72,7 @@ where
         info!(
             selected = decision.selected_job_ids.len(),
             running = running_count,
-            \"scheduler selected jobs\"
+            "scheduler selected jobs"
         );
 
         // 3. Transition jobs to Running and spawn execution
@@ -90,7 +90,7 @@ where
             if transitioned.is_err() {
                 warn!(
                     job_id = %job_id,
-                    \"failed to transition job to running (likely raced)\"
+                    "failed to transition job to running (likely raced)"
                 );
                 continue;
             }
